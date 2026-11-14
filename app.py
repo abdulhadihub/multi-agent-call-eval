@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+from datetime import datetime, timezone
 from pathlib import Path
 from uuid import uuid4
 
@@ -110,8 +111,20 @@ def _build_graph():
 
 
 def _run_transcript(transcript: dict, graph) -> None:
+    from stores.limits import run_cap_error
+
     session_id = st.session_state["session_id"]
     run_id = uuid4().hex
+    deps = _build_deps()
+    cap_error = run_cap_error(
+        deps.store,
+        session_id,
+        deps.settings.session_run_limit,
+        deps.settings.daily_run_limit,
+    )
+    if cap_error:
+        st.error(cap_error)
+        return
     config = {"configurable": {"thread_id": f"{session_id}:{run_id}"}}
     node_states = {node: "pending" for node in NODE_STATES}
     node_states["extractor"] = "running"
@@ -134,9 +147,19 @@ def _run_transcript(transcript: dict, graph) -> None:
         "memories": [],
     }
 
+    deps.store.add_run({
+        "id": run_id,
+        "session_id": session_id,
+        "transcript_id": transcript["id"],
+        "status": "running",
+        "started_at": datetime.now(timezone.utc).isoformat(),
+    })
+    run_status = "completed"
+
     try:
         for event in graph.stream(state, config, stream_mode="updates"):
             if "__interrupt__" in event:
+                run_status = "interrupted"
                 pending = event["__interrupt__"][0].value
                 st.session_state["pending"] = pending
                 node_states["approval"] = "waiting"
@@ -160,6 +183,7 @@ def _run_transcript(transcript: dict, graph) -> None:
             if snapshot.values.get("trace") is not None:
                 st.session_state["trace"] = snapshot.values["trace"]
     except Exception as exc:
+        run_status = "error"
         node_states["extractor"] = "error"
         st.session_state["node_states"] = dict(node_states)
         st.session_state["last_result"] = {
@@ -167,6 +191,8 @@ def _run_transcript(transcript: dict, graph) -> None:
             "escalation_reason": "app_error",
             "errors": [str(exc)],
         }
+    finally:
+        deps.store.finish_run(run_id, run_status)
 
 
 def _resume_run(approved: bool) -> None:
@@ -176,6 +202,8 @@ def _resume_run(approved: bool) -> None:
     if not config:
         return
 
+    run_id = st.session_state.get("run_id")
+    deps = _build_deps()
     graph = _build_graph()
     try:
         result = graph.invoke(
@@ -185,7 +213,14 @@ def _resume_run(approved: bool) -> None:
             }),
             config,
         )
+        if run_id:
+            deps.store.finish_run(
+                run_id,
+                "escalated" if result.get("escalated") else "completed",
+            )
     except Exception as exc:
+        if run_id:
+            deps.store.finish_run(run_id, "error")
         st.session_state["pending"] = None
         st.session_state["last_result"] = {
             "escalated": True,

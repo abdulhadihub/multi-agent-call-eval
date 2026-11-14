@@ -408,6 +408,13 @@ class SqliteStore:
                 (session_id, since),
             ).fetchone()[0]
 
+    def count_all_runs(self, since: str) -> int:
+        with self._connect() as conn:
+            return conn.execute(
+                "SELECT COUNT(*) FROM runs WHERE started_at >= ?",
+                (since,),
+            ).fetchone()[0]
+
     def clear_session_data(self) -> None:
         with self._connect() as conn:
             conn.execute("DELETE FROM interactions WHERE scope = 'session'")
