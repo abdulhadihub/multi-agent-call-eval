@@ -22,7 +22,8 @@ def test_happy_path_approves_and_executes():
     state = {
         "run_id": "r1", "session_id": "s1", "transcript_id": "acme_003",
         "transcript_occurred_at": "2026-09-02T10:00:00Z",
-        "transcript": "Charged twice.", "trace": [], "errors": [],
+        "transcript": "Hi, this is Priya from Acme Logistics. Charged twice.",
+        "trace": [], "errors": [],
     }
     payload = run_to_interrupt(graph, state, config)
     assert payload["proposal"]["tool_calls"][0]["tool"] == "create_ticket"
@@ -43,7 +44,8 @@ def test_low_confidence_stops_before_memory_and_action():
     state = {
         "run_id": "r2", "session_id": "s2", "transcript_id": "atlas_002",
         "transcript_occurred_at": "2026-09-16T10:00:00Z",
-        "transcript": "It is not working.", "trace": [], "errors": [],
+        "transcript": "Hi, this is Atlas Freight. It is not working.",
+        "trace": [], "errors": [],
     }
     result = graph.invoke(state, config)
     assert result["escalated"] is True
@@ -62,7 +64,8 @@ def test_rejection_writes_audit_and_skips_execution():
     state = {
         "run_id": "r3", "session_id": "s3", "transcript_id": "acme_003",
         "transcript_occurred_at": "2026-09-02T10:00:00Z",
-        "transcript": "Charged twice.", "trace": [], "errors": [],
+        "transcript": "Hi, this is Priya from Acme Logistics. Charged twice.",
+        "trace": [], "errors": [],
     }
     run_to_interrupt(graph, state, config)
     result = graph.invoke(
