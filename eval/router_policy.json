@@ -1,0 +1,19 @@
+{
+  "generated_at": "2026-11-14T18:22:24.902428+00:00",
+  "tasks": {
+    "extract": {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "fallback_provider": "groq",
+      "fallback_model": "openai/gpt-oss-120b",
+      "reason": "best F1 0.318 at $0.0004 per transcript"
+    },
+    "propose": {
+      "provider": "groq",
+      "model": "openai/gpt-oss-20b",
+      "fallback_provider": "groq",
+      "fallback_model": "openai/gpt-oss-120b",
+      "reason": "best F1 0.400 at $0.0002 per transcript"
+    }
+  }
+}
