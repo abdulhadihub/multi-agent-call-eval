@@ -1,0 +1,6 @@
+{
+  "id": "blueharbor_002",
+  "title": "Blue Harbor Retail: replacement tracking",
+  "occurred_at": "2026-06-18T10:00:00Z",
+  "transcript": "Agent: Blue Harbor support, this is Noah. How can I help?\nCustomer: Hi Noah, this is Dana from Blue Harbor Retail. I am checking on the replacement for order BH-7734. We sent the photos but have not received tracking.\nAgent: Let me look at ticket T-3001. I see the photos were added on June 15. The replacement was approved and packed on June 17. It is scheduled to leave the warehouse today.\nCustomer: Can you confirm the shipping address? We have two docks and the replacement needs to go to the main one.\nAgent: The order shows the main dock address. I will add a note to the ticket to make sure the carrier uses the main dock.\nCustomer: Good. When will it arrive?\nAgent: The estimate is June 21 to June 23. I will email the tracking number as soon as it is generated. The follow-up is still set for June 22.\nCustomer: Perfect. And the damaged units? Do you need them back?\nAgent: No, the warehouse does not need them returned. You can dispose of them safely.\nCustomer: That is easier. Thanks for checking.\nAgent: You are welcome. I will send the tracking update today."
+}
