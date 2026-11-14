@@ -1,0 +1,15 @@
+.git
+.gitignore
+.env
+.venv
+__pycache__
+*.pyc
+.pytest_cache
+data/*.db
+data/chroma
+tests
+.superpowers
+*.log
+assets
+docs
+README.md
