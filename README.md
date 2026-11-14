@@ -5,7 +5,8 @@ per-customer history, and executes approved company actions through a scoped
 permission layer. The repository includes a benchmark-driven model router and a
 reproducible evaluation against a stateless baseline.
 
-Live demo: [Hugging Face Space](https://huggingface.co/spaces/abdulhadihub/multi-agent-call-eval)
+Live demo: see [Deploy](#deploy) for the free Streamlit Community Cloud setup.
+Add the public app URL here after the first deployment.
 
 Video: see [docs/demo-script.md](docs/demo-script.md) for the three-minute walkthrough.
 
@@ -191,12 +192,25 @@ cp .env.example .env
 
 ## Deploy
 
-```bash
-.venv/bin/python scripts/deploy_hf.py
-```
+### Streamlit Community Cloud (free)
 
-The script creates the Docker Space, uploads the repository, and sets the runtime
-secrets. It reads `HF_TOKEN` from `.env`.
+1. Push the repository to GitHub and make it public.
+2. Go to https://share.streamlit.io and create an app from the repository.
+3. Set the main file to `app.py`.
+4. Add the runtime keys from `.env.example` in the app secrets panel. Use the
+   same key names. TOML syntax works, for example
+   `GROQ_API_KEY = "gsk_..."`. The `HF_TOKEN` key is not used by the app.
+5. Deploy.
+
+The app seeds SQLite and Chroma on first run, so there is no database to manage.
+Streamlit Community Cloud provides the `st.secrets` values to the app.
+
+### Hugging Face Docker Space
+
+Hugging Face now requires a PRO subscription for Docker Spaces on the free CPU
+tier. If you have PRO, `scripts/deploy_hf.py` creates the Space, uploads the
+repository, and sets the runtime secrets from `.env`. The Dockerfile is included
+for that path.
 
 ## Data note
 
