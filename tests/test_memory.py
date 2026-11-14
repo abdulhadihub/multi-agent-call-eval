@@ -55,6 +55,22 @@ def test_session_memory_never_crosses_sessions():
     )) == 1
 
 
+def test_session_hits_ignore_time_cutoff():
+    memory = _memory()
+    memory.add(
+        interaction_id="session-1", customer_id="acme", text="session",
+        embedding=[1.0, 0.0], summary="Session", resolution=None,
+        occurred_at="2026-11-14T00:00:00Z", scope="session",
+        session_id="s1", run_id="run-1",
+    )
+    hits = memory.search(
+        customer_id="acme", query_embedding=[1.0, 0.0], top_k=3,
+        before="2026-09-02T00:00:00Z", session_id="s1",
+        exclude_run_id="run-2",
+    )
+    assert [hit["interaction_id"] for hit in hits] == ["session-1"]
+
+
 def test_current_run_is_excluded():
     memory = _memory()
     memory.add(

@@ -88,7 +88,7 @@ class ChromaMemory:
                     continue
                 if exclude_run_id and metadata.get("run_id") == exclude_run_id:
                     continue
-            if before is not None and metadata.get("occurred_at", "") >= before:
+            elif before is not None and metadata.get("occurred_at", "") >= before:
                 continue
             hits.append({
                 "interaction_id": interaction_id,

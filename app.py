@@ -131,6 +131,7 @@ def _run_transcript(transcript: dict, graph) -> None:
 
     st.session_state["config"] = config
     st.session_state["run_id"] = run_id
+    st.session_state["transcript"] = transcript
     st.session_state["pending"] = None
     st.session_state["last_result"] = None
     st.session_state["trace"] = []
@@ -218,6 +219,21 @@ def _resume_run(approved: bool) -> None:
                 run_id,
                 "escalated" if result.get("escalated") else "completed",
             )
+        transcript = st.session_state.get("transcript")
+        if run_id and transcript and result.get("extraction"):
+            from stores.session import persist_session_run
+
+            persist_session_run(
+                deps.store,
+                deps.memory,
+                deps.embedder,
+                session_id=st.session_state["session_id"],
+                run_id=run_id,
+                transcript_id=transcript["id"],
+                transcript=transcript["transcript"],
+                extraction=result["extraction"],
+                proposal=result.get("proposal") or {},
+            )
     except Exception as exc:
         if run_id:
             deps.store.finish_run(run_id, "error")
@@ -276,8 +292,16 @@ def _render_run_state() -> None:
                     f"**Intent** {extraction.get('intent', '-')}  \n"
                     f"**Confidence** {extraction.get('confidence', '-')}"
                 )
+            memory_note = last_result.get("memory_note")
+            if memory_note:
+                st.markdown(f"**Memory** {memory_note}")
             memories = last_result.get("memories") or []
-            st.caption(f"Memory hits: {len(memories)}")
+            for hit in memories[:3]:
+                st.caption(
+                    f"{hit.get('interaction_id')} · "
+                    f"{hit.get('summary', '')} · "
+                    f"{float(hit.get('similarity', 0.0)):.2f}"
+                )
         else:
             st.caption("Choose a transcript and run the mesh.")
 
@@ -300,6 +324,28 @@ def _render_run_state() -> None:
 
             st.subheader("Audit")
             render_audit(events)
+
+    last_result = st.session_state.get("last_result") or {}
+    tool_results = last_result.get("tool_results") or []
+    if tool_results:
+        import pandas as pd
+
+        st.subheader("Tool results")
+        st.dataframe(
+            pd.DataFrame([
+                {
+                    "tool": item.get("tool"),
+                    "status": item.get("status"),
+                    "result": json.dumps(
+                        item.get("result"),
+                        default=str,
+                    ),
+                }
+                for item in tool_results
+            ]),
+            hide_index=True,
+            width="stretch",
+        )
 
 
 def main() -> None:
