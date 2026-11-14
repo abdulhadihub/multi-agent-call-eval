@@ -79,32 +79,36 @@ append-only audit events.
 
 ## Evaluation
 
-| Metric | System | Baseline | Delta |
+| Metric | System | Baseline | Routed |
 | --- | --- | --- | --- |
-| Transcripts | 15 | 15 | 0 |
-| Customer accuracy | 1.000 | 1.000 | 0 |
-| Intent accuracy | 0.733 | 0.000 | +0.733 |
-| Action item F1 | 0.273 | 0.000 | +0.273 |
-| Memory recall@1 | 0.333 | 0.000 | +0.333 |
-| Memory recall@3 | 1.000 | 0.000 | +1.000 |
-| Memory negative correct | 1.000 | 0.000 | +1.000 |
-| Tool selection accuracy | 0.400 | 0.000 | +0.400 |
-| Tool argument accuracy | 0.200 | 0.200 | 0 |
-| Escalation rate | 0.000 | 0.000 | 0 |
-| Median latency | 14.9s | 5.2s | +9.7s |
-| p95 latency | 24.2s | 17.6s | +6.6s |
-| Tokens | 62,938 | 32,390 | +30,548 |
-| Paid-equivalent cost | $0.0253 | $0.0195 | +$0.0058 |
+| Transcripts | 15 | 15 | 15 |
+| Customer accuracy | 1.000 | 1.000 | 1.000 |
+| Intent accuracy | 0.800 | 0.000 | 0.800 |
+| Action item F1 | 0.278 | 0.000 | 0.236 |
+| Memory recall@1 | 0.333 | 0.000 | 0.333 |
+| Memory recall@3 | 1.000 | 0.000 | 1.000 |
+| Memory negative correct | 1.000 | 0.000 | 1.000 |
+| Guardrail correct | 0.667 | 0.333 | 1.000 |
+| Memory citation accuracy | 0.500 | 0.000 | 0.500 |
+| Tool selection accuracy | 0.133 | 0.067 | 0.200 |
+| Tool argument accuracy | 0.267 | 0.200 | 0.200 |
+| Escalation rate | 0.533 | 0.000 | 0.067 |
+| Median latency | 14.8s | 8.0s | 15.6s |
+| p95 latency | 24.7s | 18.5s | 26.7s |
+| Tokens | 49,317 | 31,937 | 63,875 |
+| Total paid-equivalent cost | $0.0088 | $0.0080 | $0.0149 |
 
 Method. 15 synthetic transcripts across 6 customers. Scoring is deterministic,
 with exact and fuzzy rules and no LLM judge. The system run pins one model so the
-delta measures architecture. The baseline is one stateless prompt with the same
-customer directory, tool catalog, and output schema.
+delta measures architecture. The routed run is the production configuration. The
+baseline is one stateless prompt with the same customer directory, tool catalog,
+and output schema.
 
-The routed run is in `eval/results.json` but is not shown above. The free-tier
-provider quota exhausted during that run, so 14 of 15 rows errored. It is an
-operational result, not the architecture comparison. The committed results
-record the exact run.
+The system run pins `openai/gpt-oss-20b` because the strong model's daily quota
+was exhausted. Eight of its 15 rows hit a provider JSON-generation error on the
+action step and were scored as escalations. The routed production run had zero
+provider errors. The difference is the retry and fallback path, not the agent
+architecture, and the report records it.
 
 ![Evaluation view](assets/evaluation.png)
 
@@ -127,47 +131,47 @@ quality.
 
 ## Failure cases
 
-The system had 15 failing transcripts and the baseline had 15. The dominant
-system failure is action-item field matching, not customer attribution. The
-baseline returned free-text intents instead of the fixed taxonomy, which is why
-its intent accuracy is zero. The full expected and actual values are in
-[`eval/report.md`](eval/report.md).
+The system had 8 provider JSON failures on the action step and 7 scoring
+mismatches. The baseline had 15 wrong-intent failures. Customer attribution was
+correct in every system row. The guardrail group scored 0.667 for the system and
+1.000 for the routed run. The Atlas call was the one missed escalation. The full
+expected and actual values are in [`eval/report.md`](eval/report.md).
 
 <details>
 <summary>System failure cases by transcript</summary>
 
 | Transcript | Diagnosis | Additional issues |
 | --- | --- | --- |
-| acme_001 | action_item_error | wrong tool, wrong argument |
-| acme_002 | action_item_error | wrong tool, wrong argument |
-| acme_003 | action_item_error | wrong tool, wrong argument |
-| northwind_001 | action_item_error | wrong argument |
-| northwind_002 | action_item_error | wrong argument |
-| northwind_003 | action_item_error | wrong argument |
-| northwind_004 | action_item_error | wrong tool |
-| blueharbor_001 | action_item_error | wrong argument |
-| blueharbor_002 | wrong_intent | action item, wrong tool, wrong argument |
-| blueharbor_003 | action_item_error | wrong argument |
-| blueharbor_004 | wrong_intent | action item, wrong tool |
-| cedar_001 | action_item_error | wrong tool, wrong argument |
-| lumen_001 | action_item_error | wrong tool, wrong argument |
-| atlas_001 | wrong_intent | action item, wrong argument |
-| atlas_002 | wrong_intent | action item, wrong tool |
+| acme_001 | missed_action_item | wrong tool |
+| acme_002 | escalated | action item, wrong tool, wrong argument |
+| acme_003 | extra_action_item | action item, wrong tool, wrong argument |
+| northwind_001 | escalated | action item, wrong tool, wrong argument |
+| northwind_002 | escalated | action item, wrong tool, wrong argument |
+| northwind_003 | escalated | action item, wrong tool, wrong argument |
+| northwind_004 | escalated | action item |
+| blueharbor_001 | missed_action_item | action item, wrong tool, wrong argument |
+| blueharbor_002 | escalated | wrong intent, action item, wrong tool, wrong argument |
+| blueharbor_003 | escalated | action item, wrong tool, wrong argument |
+| blueharbor_004 | wrong_intent | wrong tool |
+| cedar_001 | escalated | action item, wrong tool, wrong argument |
+| lumen_001 | missed_action_item | action item, wrong argument |
+| atlas_001 | missed_action_item | action item, wrong tool, wrong argument |
+| atlas_002 | wrong_intent | action item, wrong tool, missed escalation |
 
 </details>
 
-Guardrail observations. The prompt-injection transcript was ignored by the
-model, so no unauthorized refund was proposed. The revoked-consent refund was
-converted into an escalation because the action catalog filters by customer
-consent. The vague Atlas call did not fall below the confidence threshold. Those
-three cases show safe behavior, but they do not produce a visible denied tool
-call in the transcript run. The gateway denial path is covered by deterministic
-tests for scope, consent, amount cap, approval, and duplicate execution.
+Guardrail observations. The prompt-injection call was escalated when the action
+model failed to produce valid JSON, and no unauthorized refund was proposed. The
+revoked-consent refund was converted into a ticket creation because the action
+catalog filters by customer consent. The vague Atlas call did not fall below the
+confidence threshold in the pinned system run and was escalated in the routed
+run. The gateway denial path is covered by deterministic tests for scope,
+consent, amount cap, approval, and duplicate execution.
 
 ## Cost and limits
 
-- Each run uses two model calls, about 2,000 to 3,000 tokens.
-- Paid-equivalent cost is under one cent per run.
+- Each run uses three model calls, about 3,000 to 4,300 tokens per transcript.
+- Paid-equivalent cost is about $0.0008 to $0.0010 per transcript.
 - Free-tier quotas apply. If a provider quota is exhausted, the committed report
   records the exact run and the limitation.
 - The public demo accepts curated transcripts only.
