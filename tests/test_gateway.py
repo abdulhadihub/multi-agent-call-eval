@@ -83,3 +83,62 @@ def test_audit_events_are_append_only(tmp_path):
     )
     events = gw.store.list_audit_events("r1")
     assert [e["event_type"] for e in events] == ["attempted", "executed"]
+
+
+def test_mismatched_customer_id_is_denied(tmp_path):
+    gw = make_gateway(tmp_path)
+    result = gw.execute(
+        agent="executor", tool="issue_refund",
+        args={"customer_id": "blueharbor", "amount": 10, "reason": "x"},
+        run_id="r1", session_id="s1", approved=True,
+        customer=gw.store.get_customer("acme"),
+    )
+    assert result.status == "denied"
+    assert result.error == "customer_mismatch"
+
+
+def test_create_ticket_mismatched_customer_is_denied(tmp_path):
+    gw = make_gateway(tmp_path)
+    result = gw.execute(
+        agent="executor", tool="create_ticket",
+        args={
+            "customer_id": "blueharbor",
+            "subject": "x",
+            "priority": "normal",
+            "description": "x",
+        },
+        run_id="r1", session_id="s1", approved=True,
+        customer=gw.store.get_customer("acme"),
+    )
+    assert result.status == "denied"
+    assert result.error == "customer_mismatch"
+
+
+def test_get_open_tickets_mismatched_customer_is_denied(tmp_path):
+    gw = make_gateway(tmp_path)
+    result = gw.execute(
+        agent="extractor", tool="get_open_tickets",
+        args={"customer_id": "blueharbor"},
+        run_id="r1", session_id="s1", approved=False,
+        customer=gw.store.get_customer("acme"),
+    )
+    assert result.status == "denied"
+    assert result.error == "customer_mismatch"
+
+
+def test_update_ticket_ownership_is_denied(tmp_path):
+    gw = make_gateway(tmp_path)
+    gw.store.add_ticket({
+        "id": "T-3001", "customer_id": "blueharbor", "subject": "Other",
+        "status": "open", "priority": "normal", "description": "",
+        "scope": "seed", "session_id": None,
+        "updated_at": "2026-08-01T00:00:00Z",
+    })
+    result = gw.execute(
+        agent="executor", tool="update_ticket",
+        args={"ticket_id": "T-3001", "fields": {"status": "resolved"}},
+        run_id="r1", session_id="s1", approved=True,
+        customer=gw.store.get_customer("acme"),
+    )
+    assert result.status == "denied"
+    assert result.error == "ticket_ownership_denied"

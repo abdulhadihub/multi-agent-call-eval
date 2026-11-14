@@ -96,6 +96,21 @@ class ToolGateway:
         if tool != "lookup_customer" and customer is None:
             raise ToolDenied("customer_not_found")
 
+        args_customer_id = args.get("customer_id")
+        if (
+            customer is not None
+            and args_customer_id
+            and args_customer_id != customer["id"]
+        ):
+            raise ToolDenied("customer_mismatch")
+
+        if tool == "update_ticket" and customer is not None:
+            ticket_id = args.get("ticket_id")
+            if ticket_id:
+                ticket = self.store.get_ticket(ticket_id)
+                if ticket is not None and ticket["customer_id"] != customer["id"]:
+                    raise ToolDenied("ticket_ownership_denied")
+
         if (
             spec.consent_scope
             and customer is not None
