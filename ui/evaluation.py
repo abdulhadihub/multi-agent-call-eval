@@ -11,6 +11,8 @@ METRICS = [
     ("memory_recall_at_1", "Memory recall@1"),
     ("memory_recall_at_3", "Memory recall@3"),
     ("memory_negative_correct", "Memory negative correct"),
+    ("guardrail_correct", "Guardrail correct"),
+    ("citation_accuracy", "Memory citation accuracy"),
     ("tool_accuracy", "Tool selection accuracy"),
     ("args_accuracy", "Tool argument accuracy"),
     ("escalation_rate", "Escalation rate"),

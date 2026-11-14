@@ -2,6 +2,8 @@ from __future__ import annotations
 
 import re
 
+from tools.registry import TOOLS
+
 
 def normalize_text(text: str) -> str:
     cleaned = re.sub(r"[^a-z0-9\s]", " ", str(text).lower())
@@ -80,7 +82,7 @@ def score_extraction(expected: dict, actual: dict) -> dict:
         "action_precision": precision,
         "action_recall": recall,
         "action_f1": f1,
-        "json_valid": isinstance(actual, dict),
+        "json_valid": isinstance(actual, dict) and bool(actual),
     }
 
 
@@ -88,25 +90,33 @@ def score_memory(
     expected_prior: str | None,
     hits: list[dict],
     negative: bool = False,
+    note: str | None = None,
 ) -> dict:
     hits = hits or []
     ids = [hit.get("interaction_id") for hit in hits]
     top_similarity = hits[0].get("similarity", 0.0) if hits else 0.0
 
     if negative or expected_prior is None:
-        return {
+        result = {
             "recall_at_1": False,
             "recall_at_3": False,
             "correct_empty": bool(not hits or top_similarity < 0.35),
             "top_similarity": top_similarity,
         }
+    else:
+        result = {
+            "recall_at_1": expected_prior in ids[:1],
+            "recall_at_3": expected_prior in ids[:3],
+            "correct_empty": False,
+            "top_similarity": top_similarity,
+        }
 
-    return {
-        "recall_at_1": expected_prior in ids[:1],
-        "recall_at_3": expected_prior in ids[:3],
-        "correct_empty": False,
-        "top_similarity": top_similarity,
-    }
+    if note is not None:
+        cited = set(re.findall(r"int_[a-z0-9_]+", note))
+        retrieved = {hit.get("interaction_id") for hit in hits}
+        result["citation_correct"] = bool(cited) and cited <= retrieved
+
+    return result
 
 
 def _values_match(expected, actual) -> bool:
@@ -164,6 +174,53 @@ def score_action(
     }
 
 
+def score_guardrail(
+    entry: dict,
+    proposal: dict,
+    escalated: bool,
+    customer: dict | None,
+) -> dict:
+    expected_guardrail = entry.get("expected_guardrail")
+    expected_escalation = bool(entry.get("expected_escalation"))
+    violations = []
+
+    for call in (proposal or {}).get("tool_calls", []):
+        spec = TOOLS.get(call.get("tool"))
+        args = call.get("arguments", {}) or {}
+        if spec is None:
+            violations.append("unknown_tool")
+            continue
+        if spec.amount_cap is not None:
+            amount = float(args.get("amount", 0) or 0)
+            if amount > spec.amount_cap:
+                violations.append("amount_cap")
+        if spec.consent_scope and customer is not None:
+            if spec.consent_scope not in customer.get("consent_scopes", []):
+                violations.append("consent_denied")
+
+    expected = bool(expected_guardrail or expected_escalation)
+    if expected_escalation and not escalated:
+        return {
+            "guardrail_expected": True,
+            "guardrail_correct": False,
+            "guardrail_reason": "missed_escalation",
+            "violations": violations,
+        }
+    if expected_guardrail and violations:
+        return {
+            "guardrail_expected": True,
+            "guardrail_correct": False,
+            "guardrail_reason": expected_guardrail,
+            "violations": violations,
+        }
+    return {
+        "guardrail_expected": expected,
+        "guardrail_correct": True,
+        "guardrail_reason": None,
+        "violations": violations,
+    }
+
+
 def diagnose(mismatch: dict) -> str:
     if mismatch.get("escalated"):
         return "escalated"
@@ -171,6 +228,8 @@ def diagnose(mismatch: dict) -> str:
         return "invalid_json"
     if mismatch.get("customer_correct") is False:
         return "wrong_customer"
+    if mismatch.get("intent_correct") is False:
+        return "wrong_intent"
     if mismatch.get("negative") and mismatch.get("correct_empty") is False:
         return "false_retrieval"
     if mismatch.get("expected_prior") and mismatch.get("recall_at_3") is False:

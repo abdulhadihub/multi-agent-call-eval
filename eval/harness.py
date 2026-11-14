@@ -15,7 +15,13 @@ matplotlib.use("Agg")
 import matplotlib.pyplot as plt
 
 from eval.baseline import run_baseline
-from eval.scoring import score_action, score_extraction, score_memory
+from eval.scoring import (
+    diagnose,
+    score_action,
+    score_extraction,
+    score_guardrail,
+    score_memory,
+)
 from mesh.config import Settings
 from mesh.deps import MeshDeps
 from mesh.llm import GeminiClient, GroqClient
@@ -82,6 +88,8 @@ def _expected_payload(entry: dict) -> dict:
         "expected_tool_calls": entry.get("expected_tool_calls", []),
         "prior_interaction_id": entry.get("prior_interaction_id"),
         "tags": entry.get("tags", []),
+        "expected_guardrail": entry.get("expected_guardrail"),
+        "expected_escalation": entry.get("expected_escalation"),
     }
 
 
@@ -90,6 +98,7 @@ def _row_from_state(entry: dict, state: dict, latency_ms: int) -> dict:
     proposal = state.get("proposal") or {}
     memories = state.get("memories", [])
 
+    customer = state.get("customer") or {}
     scores = {"extraction": score_extraction(entry, extraction)}
     if entry.get("memory_probe"):
         expected_prior = _expected_prior(entry.get("prior_interaction_id"))
@@ -97,10 +106,17 @@ def _row_from_state(entry: dict, state: dict, latency_ms: int) -> dict:
             expected_prior,
             memories,
             negative=expected_prior is None,
+            note=state.get("memory_note"),
         )
     scores["action"] = score_action(
         entry.get("expected_tool_calls", []),
         proposal.get("tool_calls", []),
+    )
+    scores["guardrail"] = score_guardrail(
+        entry,
+        proposal,
+        bool(state.get("escalated")),
+        customer,
     )
 
     trace = state.get("trace", [])
@@ -226,6 +242,12 @@ def run_baseline_all(
                 proposal.get("tool_calls", []),
             ),
         }
+        scores["guardrail"] = score_guardrail(
+            entry,
+            proposal,
+            False,
+            customer,
+        )
         rows.append({
             "transcript_id": entry["id"],
             "customer_id": entry["customer_id"],
@@ -287,6 +309,14 @@ def _aggregate(rows: list[dict]) -> dict:
         row for row in memory_rows
         if not row["expected"].get("prior_interaction_id")
     ]
+    guardrail_rows = [
+        row for row in rows
+        if row["scores"].get("guardrail", {}).get("guardrail_expected")
+    ]
+    citation_rows = [
+        row for row in rows
+        if row["scores"].get("memory", {}).get("citation_correct") is not None
+    ]
 
     return {
         "n": len(rows),
@@ -304,6 +334,15 @@ def _aggregate(rows: list[dict]) -> dict:
         "memory_negative_correct": _mean([
             1.0 if row["scores"]["memory"]["correct_empty"] else 0.0
             for row in negative
+        ]),
+        "guardrail_correct": _mean([
+            1.0 if row["scores"]["guardrail"]["guardrail_correct"] else 0.0
+            for row in guardrail_rows
+        ]),
+        "guardrail_cases": len(guardrail_rows),
+        "citation_accuracy": _mean([
+            1.0 if row["scores"]["memory"]["citation_correct"] else 0.0
+            for row in citation_rows
         ]),
         "tool_accuracy": _mean(values("action", "tool_correct")),
         "args_accuracy": _mean(values("action", "args_correct")),
@@ -340,7 +379,11 @@ def _failure_rows(system: list[dict], baseline: list[dict]) -> list[dict]:
             action = row["scores"].get("action", {})
             memory = row["scores"].get("memory")
             reasons = []
-            if row["escalated"]:
+            unexpected_escalation = (
+                row["escalated"]
+                and not row["expected"].get("expected_escalation")
+            )
+            if unexpected_escalation:
                 reasons.append("escalated")
             if extraction.get("customer_correct") is False:
                 reasons.append("wrong_customer")
@@ -363,11 +406,42 @@ def _failure_rows(system: list[dict], baseline: list[dict]) -> list[dict]:
                     and not memory.get("correct_empty")
                 ):
                     reasons.append("false_retrieval")
+            guardrail = row["scores"].get("guardrail") or {}
+            if (
+                guardrail.get("guardrail_expected")
+                and not guardrail.get("guardrail_correct")
+            ):
+                reasons.append(
+                    guardrail.get("guardrail_reason") or "guardrail_failure"
+                )
             if reasons:
+                diagnosis = diagnose({
+                    "escalated": unexpected_escalation,
+                    "json_valid": extraction.get("json_valid", True),
+                    "customer_correct": extraction.get("customer_correct", True),
+                    "intent_correct": extraction.get("intent_correct", True),
+                    "negative": bool(
+                        not row["expected"].get("prior_interaction_id")
+                        and memory
+                    ),
+                    "correct_empty": (
+                        memory.get("correct_empty") if memory else None
+                    ),
+                    "expected_prior": row["expected"].get(
+                        "prior_interaction_id"
+                    ),
+                    "recall_at_3": (
+                        memory.get("recall_at_3") if memory else None
+                    ),
+                    "action_recall": extraction.get("action_recall", 1.0),
+                    "action_precision": extraction.get("action_precision", 1.0),
+                    "tool_correct": action.get("tool_correct", True),
+                    "args_correct": action.get("args_correct", True),
+                })
                 failures.append({
                     "run": label,
                     "transcript_id": row["transcript_id"],
-                    "diagnosis": reasons[0],
+                    "diagnosis": diagnosis,
                     "reasons": reasons,
                     "expected": row["expected"],
                     "actual": {
@@ -407,6 +481,8 @@ def write_report(results: dict, path: Path) -> None:
         ("memory_recall_at_1", "Memory recall@1"),
         ("memory_recall_at_3", "Memory recall@3"),
         ("memory_negative_correct", "Memory negative correct"),
+        ("guardrail_correct", "Guardrail correct"),
+        ("citation_accuracy", "Memory citation accuracy"),
         ("tool_accuracy", "Tool selection accuracy"),
         ("args_accuracy", "Tool argument accuracy"),
         ("escalation_rate", "Escalation rate"),
@@ -427,12 +503,20 @@ def write_report(results: dict, path: Path) -> None:
         "",
         "## Per transcript",
         "",
-        "| ID | Group | Escalated | Customer | Intent | Action F1 | Memory R@3 | Tool | Args | Latency ms |",
-        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
+        "| ID | Group | Escalated | Customer | Intent | Action F1 | Memory R@3 | Tool | Args | Guardrail | Latency ms |",
+        "| --- | --- | --- | --- | --- | --- | --- | --- | --- | --- | --- |",
     ]
     for row in results["system"]:
         scores = row["scores"]
         memory = scores.get("memory", {})
+        guardrail = scores.get("guardrail", {})
+        guardrail_text = "-"
+        if guardrail.get("guardrail_expected"):
+            guardrail_text = (
+                "ok"
+                if guardrail.get("guardrail_correct")
+                else (guardrail.get("guardrail_reason") or "fail")
+            )
         lines.append(
             f"| {row['transcript_id']} | {row['group']} | "
             f"{row['escalated']} | "
@@ -442,6 +526,7 @@ def write_report(results: dict, path: Path) -> None:
             f"{memory.get('recall_at_3', '-')} | "
             f"{scores['action']['tool_correct']} | "
             f"{scores['action']['args_correct']} | "
+            f"{guardrail_text} | "
             f"{row['latency_ms']} |"
         )
 
