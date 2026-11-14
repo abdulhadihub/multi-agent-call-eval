@@ -31,13 +31,16 @@ it. The write only happened after a human approved the whole proposal."
 
 ## 2:15 to 2:45 Guardrails and evaluation
 
-1. Run the low-confidence Atlas call. Show the escalation and the hidden approval.
-2. Run the prompt-injection Northwind call. Show the denied refund or the
-   policy escalation.
-3. Open the Evaluation tab. Show system vs baseline, the router benchmark, and
-   the failure cases.
+1. Run the vague Atlas call. With the current confidence rule it may escalate.
+   If it does, show the hidden approval. If it resolves, click Reject on the
+   Acme run to show the human veto.
+2. Run the prompt-injection Northwind call. The model ignores the embedded
+   instruction, so no unauthorized refund is proposed. Explain that the gateway
+   tests cover the amount-cap and consent denial paths.
+3. Open the Evaluation tab. Show system vs baseline, the guardrail group, the
+   router benchmark, and the failure cases.
 
-Say: "The mesh improves memory recall and action accuracy over the stateless
+Say: "The mesh improves memory recall and tool selection over the stateless
 baseline. The failures are documented instead of hidden."
 
 ## 2:45 to 3:00 Close
