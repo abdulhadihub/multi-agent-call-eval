@@ -4,7 +4,7 @@ from tests.conftest import fake_router, make_deps
 
 def test_extractor_resolves_known_customer():
     deps = make_deps(router=fake_router('{"customer_name":"Acme Logistics","intent":"billing_dispute","entities":{},"action_items":[],"evidence":[],"confidence":0.9}'))
-    state = {"run_id": "r1", "session_id": "s1", "transcript_id": "acme_003", "transcript": "We were charged twice.", "trace": [], "errors": []}
+    state = {"run_id": "r1", "session_id": "s1", "transcript_id": "acme_003", "transcript": "Hi, this is Priya from Acme Logistics. We were charged twice.", "trace": [], "errors": []}
     update = extractor_node(state, deps)
     assert update["extraction"]["customer_id"] == "acme"
     assert update["escalated"] is False
@@ -21,7 +21,7 @@ def test_unknown_customer_escalates():
 
 def test_low_confidence_escalates():
     deps = make_deps(router=fake_router('{"customer_name":"Atlas Freight","intent":"other","entities":{},"action_items":[],"evidence":[],"confidence":0.2}'))
-    state = {"run_id": "r1", "session_id": "s1", "transcript_id": "atlas_002", "transcript": "It is not working.", "trace": [], "errors": []}
+    state = {"run_id": "r1", "session_id": "s1", "transcript_id": "atlas_002", "transcript": "Hi, this is Atlas Freight. It is not working.", "trace": [], "errors": []}
     update = extractor_node(state, deps)
     assert update["escalated"] is True
     assert update["escalation_reason"] == "low_confidence"
@@ -47,3 +47,17 @@ def test_extractor_falls_back_to_transcript_company_name():
     update = extractor_node(state, deps)
     assert update["extraction"]["customer_id"] == "acme"
     assert update["escalated"] is False
+
+
+def test_known_customer_not_in_transcript_escalates():
+    deps = make_deps(router=fake_router(
+        '{"customer_name":"Northwind Health","intent":"billing_dispute","entities":{},"action_items":[],"evidence":[],"confidence":0.9}'
+    ))
+    state = {
+        "run_id": "r1", "session_id": "s1", "transcript_id": "acme_003",
+        "transcript": "Hi, this is Priya from Acme Logistics. We were charged twice.",
+        "trace": [], "errors": [],
+    }
+    update = extractor_node(state, deps)
+    assert update["escalated"] is True
+    assert update["escalation_reason"] == "customer_not_in_transcript"

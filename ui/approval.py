@@ -5,7 +5,13 @@ def render_approval(pending: dict) -> str | None:
     import streamlit as st
 
     proposal = pending.get("proposal") or {}
+    customer = pending.get("customer") or {}
     st.markdown("### Approval required")
+    if customer:
+        st.caption(
+            f"Customer: {customer.get('name', customer.get('id', '-'))} "
+            f"({customer.get('id', '-')})"
+        )
     if proposal.get("rationale"):
         st.markdown(proposal["rationale"])
     st.caption(f"Risk level: {proposal.get('risk_level', '-')}")

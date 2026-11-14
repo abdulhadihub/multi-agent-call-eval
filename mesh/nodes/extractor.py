@@ -74,6 +74,8 @@ def extractor_node(state: dict, deps) -> dict:
         detail={"confidence": parsed.confidence, "intent": parsed.intent},
     ).model_dump())
 
+    candidates = _transcript_candidates(state["transcript"], directory)
+
     lookup = deps.gateway.execute(
         agent="extractor",
         tool="lookup_customer",
@@ -84,18 +86,16 @@ def extractor_node(state: dict, deps) -> dict:
     )
     customer = lookup.result if lookup.status == "executed" else None
 
-    if customer is None:
-        candidates = _transcript_candidates(state["transcript"], directory)
-        if candidates:
-            lookup = deps.gateway.execute(
-                agent="extractor",
-                tool="lookup_customer",
-                args={"name": candidates[0]["name"]},
-                run_id=state["run_id"],
-                session_id=state["session_id"],
-                approved=False,
-            )
-            customer = lookup.result if lookup.status == "executed" else None
+    if customer is None and candidates:
+        lookup = deps.gateway.execute(
+            agent="extractor",
+            tool="lookup_customer",
+            args={"name": candidates[0]["name"]},
+            run_id=state["run_id"],
+            session_id=state["session_id"],
+            approved=False,
+        )
+        customer = lookup.result if lookup.status == "executed" else None
 
     extraction = parsed.model_dump()
 
@@ -111,6 +111,25 @@ def extractor_node(state: dict, deps) -> dict:
         }
 
     extraction["customer_id"] = customer["id"]
+
+    if not any(entry["id"] == customer["id"] for entry in candidates):
+        trace.append(TraceEvent(
+            node="extractor",
+            event="failed",
+            detail={
+                "error": "customer_not_in_transcript",
+                "customer_id": customer["id"],
+            },
+        ).model_dump())
+        return {
+            "extraction": extraction,
+            "confidence": parsed.confidence,
+            "customer": customer,
+            "trace": trace,
+            "escalated": True,
+            "escalation_reason": "customer_not_in_transcript",
+        }
+
     if parsed.confidence < deps.settings.confidence_threshold:
         return {
             "extraction": extraction,
