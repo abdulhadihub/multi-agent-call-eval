@@ -269,6 +269,16 @@ def _render_run_state() -> None:
 
 def main() -> None:
     st.set_page_config(page_title="Agent Mesh", layout="wide")
+    st.markdown(
+        """
+        <style>
+        header[data-testid="stHeader"] {display: none;}
+        #MainMenu {visibility: hidden;}
+        footer {visibility: hidden;}
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
     st.title("Agent Mesh")
     st.session_state.setdefault("session_id", uuid4().hex)
 
