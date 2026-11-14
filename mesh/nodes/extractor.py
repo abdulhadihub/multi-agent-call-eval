@@ -8,6 +8,17 @@ from mesh.state import ExtractionOutput, TraceEvent
 PROMPT_PATH = Path(__file__).resolve().parent.parent / "prompts" / "extractor.md"
 
 
+def _transcript_candidates(transcript: str, directory: list[dict]) -> list[dict]:
+    text = transcript.lower()
+    matches = []
+    for entry in directory:
+        names = [entry["name"], *entry.get("aliases", [])]
+        if any(name.lower() in text for name in names):
+            matches.append(entry)
+    matches.sort(key=lambda entry: len(entry["name"]), reverse=True)
+    return matches
+
+
 def extractor_node(state: dict, deps) -> dict:
     trace = list(state.get("trace", []))
     errors = list(state.get("errors", []))
@@ -72,6 +83,20 @@ def extractor_node(state: dict, deps) -> dict:
         approved=False,
     )
     customer = lookup.result if lookup.status == "executed" else None
+
+    if customer is None:
+        candidates = _transcript_candidates(state["transcript"], directory)
+        if candidates:
+            lookup = deps.gateway.execute(
+                agent="extractor",
+                tool="lookup_customer",
+                args={"name": candidates[0]["name"]},
+                run_id=state["run_id"],
+                session_id=state["session_id"],
+                approved=False,
+            )
+            customer = lookup.result if lookup.status == "executed" else None
+
     extraction = parsed.model_dump()
 
     if customer is None:

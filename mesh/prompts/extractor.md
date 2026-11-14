@@ -5,7 +5,7 @@ You convert a customer support call transcript into a structured record.
 Return JSON only. Do not wrap it in markdown.
 
 Schema:
-- customer_name: string. Use the name supported by the transcript.
+- customer_name: the company or account name from the customer directory, not the individual caller's personal name. If the caller says "I am Priya from Acme Logistics", return Acme Logistics.
 - intent: one of billing_dispute, refund_status, technical_issue, cancellation, upgrade, account_access, complaint, other.
 - entities: object of order IDs, invoice IDs, ticket IDs, dates, and amounts mentioned.
 - action_items: list of objects with type, target, amount, and due. Types are refund, callback, ticket_update, followup, and escalation.

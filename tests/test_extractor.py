@@ -33,3 +33,17 @@ def test_invalid_model_output_escalates():
     update = extractor_node(state, deps)
     assert update["escalated"] is True
     assert update["escalation_reason"] == "extraction_failed"
+
+
+def test_extractor_falls_back_to_transcript_company_name():
+    deps = make_deps(router=fake_router(
+        '{"customer_name":"Priya","intent":"refund_status","entities":{},"action_items":[],"evidence":[],"confidence":0.9}'
+    ))
+    state = {
+        "run_id": "r1", "session_id": "s1", "transcript_id": "acme_002",
+        "transcript": "Hi, this is Priya from Acme Logistics. I am following up on a refund.",
+        "trace": [], "errors": [],
+    }
+    update = extractor_node(state, deps)
+    assert update["extraction"]["customer_id"] == "acme"
+    assert update["escalated"] is False
