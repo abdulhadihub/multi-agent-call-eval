@@ -69,6 +69,6 @@ The environment uses `uv` and a local `.venv`.
 
 ## Dependencies
 
-- Python 3.12 locally, Python 3.11 in the container.
+- Python 3.12 locally and in the container. The pinned requirements are resolved on 3.12.
 - Pin versions. Prefer the standard library and small libraries.
 - Do not add a frontend framework. The UI is Streamlit plus HTML and SVG components.
