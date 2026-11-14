@@ -42,4 +42,26 @@ class Settings(BaseModel):
     @classmethod
     def load(cls) -> "Settings":
         load_dotenv()
-        return cls.from_env()
+        env = dict(os.environ)
+        try:
+            import streamlit as st
+
+            for key in (
+                "GROQ_API_KEY",
+                "GROQ_MODEL",
+                "GROQ_FAST_MODEL",
+                "GEMINI_API_KEY",
+                "GEMINI_MODEL",
+                "EMBEDDING_MODEL",
+                "EMBEDDING_DIM",
+                "DEMO_MODE",
+                "CONFIDENCE_THRESHOLD",
+                "SESSION_RUN_LIMIT",
+                "DAILY_RUN_LIMIT",
+                "LOG_LEVEL",
+            ):
+                if key in st.secrets:
+                    env[key] = str(st.secrets[key])
+        except Exception:
+            pass
+        return cls.from_env(env)
