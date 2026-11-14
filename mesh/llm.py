@@ -63,7 +63,10 @@ class GeminiClient:
     def __init__(self, api_key: str):
         from google import genai
 
-        self.client = genai.Client(api_key=api_key)
+        self.client = genai.Client(
+            api_key=api_key,
+            http_options={"api_version": "v1beta"},
+        )
 
     def complete(
         self,

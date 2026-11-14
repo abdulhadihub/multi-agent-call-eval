@@ -1,6 +1,7 @@
 from __future__ import annotations
 
 import json
+import time
 from pathlib import Path
 from typing import Any
 
@@ -62,6 +63,44 @@ def _clean_json(text: str) -> str:
     return text.strip()
 
 
+def _is_transient(exc: Exception) -> bool:
+    status = getattr(exc, "status_code", None)
+    if status in {429, 500, 502, 503, 504}:
+        return True
+    message = str(exc).lower()
+    return any(
+        term in message
+        for term in (
+            "429",
+            "rate limit",
+            "resource exhausted",
+            "unavailable",
+            "high demand",
+            "overloaded",
+            "timeout",
+            "timed out",
+        )
+    )
+
+
+def _complete_with_retry(
+    client: LLMClient,
+    model: str,
+    messages: list[dict],
+    attempts: int = 3,
+) -> LLMResponse:
+    delays = (2, 5, 10)
+    for attempt in range(attempts):
+        try:
+            return client.complete(model=model, messages=messages)
+        except Exception as exc:
+            if attempt < attempts - 1 and _is_transient(exc):
+                time.sleep(delays[attempt])
+                continue
+            raise
+    raise RuntimeError("unreachable")
+
+
 class ModelRouter:
     def __init__(
         self,
@@ -91,7 +130,7 @@ class ModelRouter:
         if client is None:
             raise ValueError(f"No client configured for provider {provider}")
 
-        response = client.complete(model=model, messages=messages)
+        response = _complete_with_retry(client, model, messages)
         cost = estimate_cost(model, response.input_tokens, response.output_tokens)
         try:
             return schema.model_validate_json(_clean_json(response.text)), response, cost
@@ -108,7 +147,7 @@ class ModelRouter:
                     f"the schema: {first_error}. Return only valid JSON."
                 ),
             }]
-            retry_response = client.complete(model=model, messages=retry_messages)
+            retry_response = _complete_with_retry(client, model, retry_messages)
             cost += estimate_cost(
                 model,
                 retry_response.input_tokens,

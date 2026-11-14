@@ -71,3 +71,21 @@ def test_invalid_json_retries_then_fails():
     )
     with pytest.raises(ValueError):
         router.complete_json(task="extract", messages=[], schema=Out)
+
+
+class RateLimited(Exception):
+    status_code = 429
+
+
+def test_retries_on_rate_limit():
+    router = ModelRouter(
+        {"groq": FakeClient([RateLimited("slow down"), '{"answer": "ok"}'])},
+        POLICY,
+        None,
+    )
+    result, response, cost = router.complete_json(
+        task="extract",
+        messages=[],
+        schema=Out,
+    )
+    assert result.answer == "ok"
