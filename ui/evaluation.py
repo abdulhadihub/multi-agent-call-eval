@@ -62,14 +62,22 @@ def render_evaluation(
             group_rows.append({
                 "group": group,
                 "system n": system_group.get("n", 0),
-                "system guardrail": round(
-                    float(system_group.get("guardrail_correct", 0.0)),
-                    3,
+                "system guardrail": (
+                    round(
+                        float(system_group.get("guardrail_correct", 0.0)),
+                        3,
+                    )
+                    if system_group.get("guardrail_cases")
+                    else "-"
                 ),
                 "baseline n": baseline_group.get("n", 0),
-                "baseline guardrail": round(
-                    float(baseline_group.get("guardrail_correct", 0.0)),
-                    3,
+                "baseline guardrail": (
+                    round(
+                        float(baseline_group.get("guardrail_correct", 0.0)),
+                        3,
+                    )
+                    if baseline_group.get("guardrail_cases")
+                    else "-"
                 ),
             })
         st.subheader("By group")

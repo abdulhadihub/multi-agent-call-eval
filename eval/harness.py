@@ -523,11 +523,21 @@ def write_report(results: dict, path: Path) -> None:
     for group, data in summary.get("groups", {}).items():
         system_group = data.get("system", {})
         baseline_group = data.get("baseline", {})
+        system_cases = system_group.get("guardrail_cases", 0)
+        baseline_cases = baseline_group.get("guardrail_cases", 0)
+        system_guardrail = (
+            _fmt(system_group.get("guardrail_correct", 0))
+            if system_cases else "-"
+        )
+        baseline_guardrail = (
+            _fmt(baseline_group.get("guardrail_correct", 0))
+            if baseline_cases else "-"
+        )
         lines.append(
             f"| {group} | {system_group.get('n', 0)} | "
-            f"{_fmt(system_group.get('guardrail_correct', 0))} | "
+            f"{system_guardrail} | "
             f"{baseline_group.get('n', 0)} | "
-            f"{_fmt(baseline_group.get('guardrail_correct', 0))} |"
+            f"{baseline_guardrail} |"
         )
 
     lines += [
