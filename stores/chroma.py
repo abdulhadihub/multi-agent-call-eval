@@ -47,6 +47,11 @@ class ChromaMemory:
             metadatas=[metadata],
         )
 
+    def delete_scope(self, scope: str) -> None:
+        if self.collection.count() == 0:
+            return
+        self.collection.delete(where={"scope": scope})
+
     def search(
         self,
         *,

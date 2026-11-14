@@ -407,3 +407,13 @@ class SqliteStore:
                 "SELECT COUNT(*) FROM runs WHERE session_id = ? AND started_at >= ?",
                 (session_id, since),
             ).fetchone()[0]
+
+    def clear_session_data(self) -> None:
+        with self._connect() as conn:
+            conn.execute("DELETE FROM interactions WHERE scope = 'session'")
+            conn.execute("DELETE FROM tickets WHERE scope = 'session'")
+            conn.execute("DELETE FROM refunds")
+            conn.execute("DELETE FROM followups")
+            conn.execute("DELETE FROM tool_calls")
+            conn.execute("DELETE FROM audit_events")
+            conn.execute("DELETE FROM runs")
