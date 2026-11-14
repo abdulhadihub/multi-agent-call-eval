@@ -196,14 +196,17 @@ cp .env.example .env
 
 1. Push the repository to GitHub and make it public.
 2. Go to https://share.streamlit.io and create an app from the repository.
-3. Set the main file to `app.py`.
-4. Add the runtime keys from `.env.example` in the app secrets panel. Use the
-   same key names. TOML syntax works, for example
-   `GROQ_API_KEY = "gsk_..."`. The `HF_TOKEN` key is not used by the app.
+3. Set the main file to `app.py` and select Python 3.12 in the advanced
+   settings. The pinned requirements target 3.12.
+4. Add `GROQ_API_KEY` in the app secrets panel. TOML syntax works, for example
+   `GROQ_API_KEY = "gsk_..."`. `GEMINI_API_KEY` is optional. The model and
+   embedding settings have defaults; add them only to override. `HF_TOKEN` is
+   not used by the app.
 5. Deploy.
 
 The app seeds SQLite and Chroma on first run, so there is no database to manage.
-Streamlit Community Cloud provides the `st.secrets` values to the app.
+The first run downloads the embedding model (about 90 MB), so it is slower than
+later runs. Streamlit Community Cloud provides the `st.secrets` values to the app.
 
 ### Hugging Face Docker Space
 

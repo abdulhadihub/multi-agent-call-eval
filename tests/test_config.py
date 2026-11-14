@@ -34,3 +34,11 @@ def test_empty_optional_key_becomes_none():
 def test_missing_required_key_raises():
     with pytest.raises(ValidationError):
         Settings.from_env({})
+
+
+def test_minimal_env_uses_model_defaults():
+    settings = Settings.from_env({"GROQ_API_KEY": "gsk_test"})
+    assert settings.groq_model == "openai/gpt-oss-120b"
+    assert settings.groq_fast_model == "openai/gpt-oss-20b"
+    assert settings.embedding_dim == 384
+    assert settings.demo_mode is True
