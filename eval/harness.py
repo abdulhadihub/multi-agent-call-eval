@@ -364,10 +364,24 @@ def summarize(
     baseline: list[dict],
     routed: list[dict],
 ) -> dict:
+    groups = {}
+    for group in GROUPS:
+        groups[group] = {
+            "system": _aggregate([
+                row for row in system if row["group"] == group
+            ]),
+            "baseline": _aggregate([
+                row for row in baseline if row["group"] == group
+            ]),
+            "routed": _aggregate([
+                row for row in routed if row["group"] == group
+            ]),
+        }
     return {
         "system": _aggregate(system),
         "baseline": _aggregate(baseline),
         "routed": _aggregate(routed),
+        "groups": groups,
     }
 
 
@@ -497,6 +511,23 @@ def write_report(results: dict, path: Path) -> None:
             f"{_fmt(summary.get('system', {}).get(key, 0))} | "
             f"{_fmt(summary.get('baseline', {}).get(key, 0))} | "
             f"{_fmt(summary.get('routed', {}).get(key, 0))} |"
+        )
+
+    lines += [
+        "",
+        "## By group",
+        "",
+        "| Group | System n | System guardrail | Baseline n | Baseline guardrail |",
+        "| --- | --- | --- | --- | --- |",
+    ]
+    for group, data in summary.get("groups", {}).items():
+        system_group = data.get("system", {})
+        baseline_group = data.get("baseline", {})
+        lines.append(
+            f"| {group} | {system_group.get('n', 0)} | "
+            f"{_fmt(system_group.get('guardrail_correct', 0))} | "
+            f"{baseline_group.get('n', 0)} | "
+            f"{_fmt(baseline_group.get('guardrail_correct', 0))} |"
         )
 
     lines += [

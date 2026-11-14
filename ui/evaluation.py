@@ -53,6 +53,32 @@ def render_evaluation(
     st.subheader("System vs baseline")
     st.dataframe(pd.DataFrame(rows), hide_index=True, width="stretch")
 
+    groups = summary.get("groups", {})
+    if groups:
+        group_rows = []
+        for group, data in groups.items():
+            system_group = data.get("system", {})
+            baseline_group = data.get("baseline", {})
+            group_rows.append({
+                "group": group,
+                "system n": system_group.get("n", 0),
+                "system guardrail": round(
+                    float(system_group.get("guardrail_correct", 0.0)),
+                    3,
+                ),
+                "baseline n": baseline_group.get("n", 0),
+                "baseline guardrail": round(
+                    float(baseline_group.get("guardrail_correct", 0.0)),
+                    3,
+                ),
+            })
+        st.subheader("By group")
+        st.dataframe(
+            pd.DataFrame(group_rows),
+            hide_index=True,
+            width="stretch",
+        )
+
     charts_dir = Path(charts_dir)
     for filename, caption in (
         ("accuracy.png", "Accuracy"),

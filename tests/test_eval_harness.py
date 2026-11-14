@@ -33,3 +33,4 @@ def test_harness_runs_two_transcripts_with_fakes():
     assert "extraction" in rows[0]
     summary = summarize(rows, [], [])
     assert "system" in summary
+    assert "groups" in summary
