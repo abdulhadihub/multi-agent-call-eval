@@ -38,6 +38,7 @@ class MeshState(TypedDict, total=False):
     transcript: str
     transcript_occurred_at: str
     customer: dict[str, Any] | None
+    tickets: list[dict[str, Any]]
     extraction: dict[str, Any] | None
     memories: list[dict[str, Any]]
     memory_note: str | None

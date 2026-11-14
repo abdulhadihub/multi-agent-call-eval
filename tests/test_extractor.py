@@ -49,6 +49,22 @@ def test_extractor_falls_back_to_transcript_company_name():
     assert update["escalated"] is False
 
 
+def test_extractor_fetches_open_tickets():
+    deps = make_deps(router=fake_router(
+        '{"customer_name":"Acme Logistics","intent":"billing_dispute","entities":{},"action_items":[],"evidence":[],"confidence":0.9}'
+    ))
+    state = {
+        "run_id": "r1", "session_id": "s1", "transcript_id": "acme_003",
+        "transcript": "Hi, this is Priya from Acme Logistics. We were charged twice.",
+        "trace": [], "errors": [],
+    }
+    update = extractor_node(state, deps)
+    assert [ticket["id"] for ticket in update["tickets"]] == ["T-1001"]
+    assert any(
+        call["tool"] == "get_open_tickets" for call in deps.gateway.calls
+    )
+
+
 def test_known_customer_not_in_transcript_escalates():
     deps = make_deps(router=fake_router(
         '{"customer_name":"Northwind Health","intent":"billing_dispute","entities":{},"action_items":[],"evidence":[],"confidence":0.9}'

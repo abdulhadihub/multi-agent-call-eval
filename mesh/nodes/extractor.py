@@ -130,11 +130,26 @@ def extractor_node(state: dict, deps) -> dict:
             "escalation_reason": "customer_not_in_transcript",
         }
 
+    ticket_result = deps.gateway.execute(
+        agent="extractor",
+        tool="get_open_tickets",
+        args={"customer_id": customer["id"]},
+        run_id=state["run_id"],
+        session_id=state["session_id"],
+        approved=False,
+    )
+    tickets = (
+        ticket_result.result
+        if ticket_result.status == "executed"
+        else []
+    )
+
     if parsed.confidence < deps.settings.confidence_threshold:
         return {
             "extraction": extraction,
             "confidence": parsed.confidence,
             "customer": customer,
+            "tickets": tickets,
             "trace": trace,
             "escalated": True,
             "escalation_reason": "low_confidence",
@@ -144,6 +159,7 @@ def extractor_node(state: dict, deps) -> dict:
         "extraction": extraction,
         "confidence": parsed.confidence,
         "customer": customer,
+        "tickets": tickets,
         "trace": trace,
         "escalated": False,
         "escalation_reason": None,

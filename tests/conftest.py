@@ -200,6 +200,17 @@ class _FakeGateway:
                 tool_call_id="fake", tool=tool,
                 status="executed", result=None,
             )
+        if tool == "get_open_tickets":
+            return ToolResult(
+                tool_call_id="fake", tool=tool,
+                status="executed",
+                result=[{
+                    "id": "T-1001",
+                    "customer_id": args.get("customer_id"),
+                    "subject": "Demo ticket",
+                    "status": "open",
+                }],
+            )
         return ToolResult(
             tool_call_id="fake", tool=tool,
             status="executed", result={"ok": True},
