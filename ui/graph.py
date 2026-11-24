@@ -99,5 +99,5 @@ def _svg(node_states: dict[str, str]) -> str:
 def render_graph(node_states: dict[str, str]) -> None:
     st.markdown(_svg(node_states), unsafe_allow_html=True)
     st.caption(
-        "Pending · Running · Done · Waiting for approval · Error"
+        "Pending · Running · Finished · Waiting for approval · Error"
     )
